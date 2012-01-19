@@ -58,7 +58,7 @@
 // const char *error;
 //
 // error = slre_match(
-//   "^(GET|POST) (\S+) HTTP/(\d)\.(\d)",
+//   "^(GET|POST) (\\S+) HTTP/(\\d)\.(\\d)",
 //   "GET /index.html HTTP/1.0",
 //    SLRE_STRING, method, sizeof(method),
 //    SLRE_STRING, uri, sizeof(uri),
