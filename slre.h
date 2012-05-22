@@ -61,10 +61,10 @@
 // error = slre_match(0,
 //   "^(GET|POST) (\\S+) HTTP/(\\d)\.(\\d)",
 //   "GET /index.html HTTP/1.0",
-//    SLRE_STRING, method, sizeof(method),
-//    SLRE_STRING, uri, sizeof(uri),
-//    SLRE_INT, &http_version_major, sizeof(http_version_major),
-//    SLRE_INT, &http_version_minor, sizeof(http_version_minor));
+//    SLRE_STRING,  sizeof(method), method,
+//    SLRE_STRING, sizeof(uri), uri,
+//    SLRE_INT, sizeof(http_version_major), &http_version_major,
+//    SLRE_INT, sizeof(http_version_minor), &http_version_minor);
 //
 // if ((error = slre_match()) != NULL) {
 //   printf("Error parsing HTTP request: %s", error);
