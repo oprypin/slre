@@ -37,6 +37,7 @@ struct slre {
   int data_size;
   int num_caps;   // Number of bracket pairs
   int anchored;   // Must match from string start
+  enum slre_option options;
   const char *error_string;   // Error string
 };
 
@@ -402,10 +403,27 @@ static int is_any_but(const unsigned char *p, int len, const char *s,
   return 1;
 }
 
+static int lowercase(const char *s) {
+  return tolower(* (const unsigned char *) s);
+}
+
+static int casecmp(const void *p1, const void *p2, size_t len) {
+  const char *s1 = p1, *s2 = p2;
+  int diff = 0;
+
+  if (len > 0)
+    do {
+      diff = lowercase(s1++) - lowercase(s2++);
+    } while (diff == 0 && s1[-1] != '\0' && --len > 0);
+
+  return diff;
+}
+
 static const char *match(const struct slre *r, int pc, const char *s, int len,
                          int *ofs, struct cap *caps) {
   int n, saved_offset;
   const char *error_string = NULL;
+  int (*cmp)(const void *string1, const void *string2, size_t len);
 
   while (error_string == NULL && r->code[pc] != END) {
 
@@ -426,8 +444,8 @@ static const char *match(const struct slre *r, int pc, const char *s, int len,
       case EXACT:
         error_string = error_no_match;
         n = r->code[pc + 2];  // String length
-        if (n <= len - *ofs && !memcmp(s + *ofs, r->data +
-                                       r->code[pc + 1], n)) {
+        cmp = r->options & SLRE_CASE_INSENSITIVE ? casecmp : memcmp;
+        if (n <= len - *ofs && !cmp(s + *ofs, r->data + r->code[pc + 1], n)) {
           (*ofs) += n;
           error_string = NULL;
         }
@@ -644,12 +662,14 @@ static const char *capture(const struct cap *caps, int num_caps, va_list ap) {
   return err;
 }
 
-const char *slre_match(const char *re, const char *buf, int buf_len, ...) {
+const char *slre_match(enum slre_option options, const char *re,
+                       const char *buf, int buf_len, ...) {
   struct slre slre;
   struct cap caps[20];
   va_list ap;
   const char *error_string = NULL;
 
+  slre.options = options;
   if ((error_string = compile2(&slre, re)) == NULL &&
       (error_string = match2(&slre, buf, buf_len, caps)) == NULL) {
     va_start(ap, buf_len);
@@ -755,25 +775,36 @@ int main(void) {
     {"", ".", "No match"},
     {" cc 1234", "c.\\s\\d+", NULL},
   };
-  char buf[7];
+  char buf[20];
   int int_value;
-  const char *msg;
+  const char *msg, *str, *re;
   size_t i;
 
   for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
-    if ((msg = slre_match(tests[i].regex, tests[i].str, strlen(tests[i].str),
-                          NULL)) != tests[i].msg) {
+    if ((msg = slre_match(0, tests[i].regex, tests[i].str,
+                          strlen(tests[i].str), NULL)) != tests[i].msg) {
       printf("Test %zd failed: [%s] [%s] -> [%s]\n", i, tests[i].str,
              tests[i].regex, msg ? msg : "(null)");
       return EXIT_FAILURE;
     }
   }
 
-  assert(slre_match("a (\\d+)4\\s*(\\S+)", "aa 1234 xy\nz", 12,
+  assert(slre_match(0, "a (\\d+)4\\s*(\\S+)", "aa 1234 xy\nz", 12,
                     SLRE_INT, sizeof(int_value), &int_value,
                     SLRE_STRING, sizeof(buf), buf) == NULL);
   assert(int_value == 123);
   assert(!strcmp(buf, "xy"));
+
+  str = "Hello превед!";
+  re = "^hello (\\S+)";
+  assert(strcmp(error_no_match, slre_match(0, re, str, strlen(str), SLRE_STRING,
+                                           sizeof(buf), buf)) == 0);
+  assert(slre_match(SLRE_CASE_INSENSITIVE, re, str, strlen(str),
+                    SLRE_STRING, sizeof(buf), buf) == NULL);
+  assert(!strcmp(buf, "превед!"));
+
+  assert(strcmp(error_no_match, slre_match(0, "bC", "aBc", 3)) == 0);
+  assert(slre_match(SLRE_CASE_INSENSITIVE, "bC", "aBc", 3) == NULL);
 
   printf("%s\n", "All tests passed");
   return EXIT_SUCCESS;

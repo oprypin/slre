@@ -45,10 +45,11 @@
 //    \meta    Match one of the meta character: ^$().[*+\?
 
 // Match string buffer "buf" of length "buf_len" against "regexp", which should
-// conform the syntax outlined above. If regular expression "regexp" contains
-// brackets, slre_match() will capture the respective substring into the
-// passed placeholder. Thus, each opening parenthesis should correspond to
-// three arguments passed:
+// conform the syntax outlined above. "options" could be either 0 or
+// SLRE_CASE_INSENSITIVE for case-insensitive match. If regular expression
+// "regexp" contains brackets, slre_match() will capture the respective
+// substring into the passed placeholder. Thus, each opening parenthesis
+// should correspond to three arguments passed:
 //   placeholder_type, placeholder_size, placeholder_address
 //
 // Usage example: parsing HTTP request line.
@@ -57,7 +58,7 @@
 // int http_version_minor, http_version_major;
 // const char *error;
 //
-// error = slre_match(
+// error = slre_match(0,
 //   "^(GET|POST) (\\S+) HTTP/(\\d)\.(\\d)",
 //   "GET /index.html HTTP/1.0",
 //    SLRE_STRING, method, sizeof(method),
@@ -75,7 +76,9 @@
 //   NULL: string matched and all captures successfully made
 //   non-NULL: in this case, the return value is an error string
 
-enum {SLRE_STRING, SLRE_INT, SLRE_FLOAT};
-const char *slre_match(const char *regexp, const char *buf, int buf_len, ...);
+enum slre_option {SLRE_CASE_INSENSITIVE = 1};
+enum slre_capture {SLRE_STRING, SLRE_INT, SLRE_FLOAT};
+const char *slre_match(enum slre_option options, const char *regexp,
+                       const char *buf, int buf_len, ...);
 
 #endif /* SLRE_HEADER_DEFINED */
