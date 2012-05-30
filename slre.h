@@ -54,23 +54,24 @@
 //
 // Usage example: parsing HTTP request line.
 //
-// char method[10], uri[100];
-// int http_version_minor, http_version_major;
-// const char *error;
+//  char method[10], uri[100];
+//  int http_version_minor, http_version_major;
+//  const char *error;
+//  const char *request = " \tGET /index.html HTTP/1.0\r\n\r\n";
+
+//  error = slre_match(0, "^\\s*(GET|POST)\\s+(\\S+)\\s+HTTP/(\\d)\\.(\\d)",
+//                     request, strlen(request),
+//                     SLRE_STRING,  sizeof(method), method,
+//                     SLRE_STRING, sizeof(uri), uri,
+//                     SLRE_INT,sizeof(http_version_major),&http_version_major,
+//                     SLRE_INT,sizeof(http_version_minor),&http_version_minor);
+// 
+//  if (error != NULL) {
+//    printf("Error parsing HTTP request: %s\n", error);
+//  } else {
+//    printf("Requested URI: %s\n", uri);
+//  }
 //
-// error = slre_match(0,
-//   "^(GET|POST) (\\S+) HTTP/(\\d)\.(\\d)",
-//   "GET /index.html HTTP/1.0",
-//    SLRE_STRING,  sizeof(method), method,
-//    SLRE_STRING, sizeof(uri), uri,
-//    SLRE_INT, sizeof(http_version_major), &http_version_major,
-//    SLRE_INT, sizeof(http_version_minor), &http_version_minor);
-//
-// if ((error = slre_match()) != NULL) {
-//   printf("Error parsing HTTP request: %s", error);
-// } else {
-//   printf("Requested URI: %s", uri);
-// }
 //
 // Return:
 //   NULL: string matched and all captures successfully made
