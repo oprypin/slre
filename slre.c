@@ -29,6 +29,10 @@
 
 #include "slre.h"
 
+#ifdef _WIN32
+#define snprintf _snprintf
+#endif
+
 // Compiled regular expression
 struct slre {
   unsigned char code[256];
@@ -557,7 +561,7 @@ static const char *match(const struct slre *r, int pc, const char *s, int len,
       case OPEN:
         if (caps != NULL) {
           if (caps_size - 2 < r->code[pc + 1]) {
-            error_string = "Too many captures";
+            error_string = "Too many brackets";
           } else {
             caps[r->code[pc + 1]].ptr = s + *ofs;
           }
@@ -839,6 +843,10 @@ int main(void) {
 
   assert(strcmp(error_no_match, slre_match(0, "bC", "aBc", 3)) == 0);
   assert(slre_match(SLRE_CASE_INSENSITIVE, "bC", "aBc", 3) == NULL);
+  assert(slre_match(0, "3?9", "9", 1) == NULL);
+
+  // TODO: fix this!
+  //assert(slre_match(0, "9?9", "9", 1) == NULL);
 
   {
     struct slre slre;
@@ -848,7 +856,7 @@ int main(void) {
     memset(caps, 'x', sizeof(caps));
     slre.options = 0;
     assert(compile2(&slre, "(\\d(\\d)?)") == NULL);
-    assert(!strcmp(match2(&slre, "1", 1, caps, 2), "Too many captures"));
+    assert(!strcmp(match2(&slre, "1", 1, caps, 2), "Too many brackets"));
     assert(match2(&slre, "1", 1, caps, 3) == NULL);
     assert(slre.num_caps == 2);
     assert(caps[1].len == 1);
