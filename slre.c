@@ -342,7 +342,7 @@ static const char *compile2(struct slre *r, const char *re) {
 }
 
 static const char *match(const struct slre *, int, const char *, int, int *,
-                         struct cap *);
+                         struct cap *, int caps_size);
 
 static void loop_greedy(const struct slre *r, int pc, const char *s, int len,
                         int *ofs) {
@@ -350,9 +350,9 @@ static void loop_greedy(const struct slre *r, int pc, const char *s, int len,
 
   saved_offset = matched_offset = *ofs;
 
-  while (!match(r, pc + 2, s, len, ofs, NULL)) {
+  while (!match(r, pc + 2, s, len, ofs, NULL, 0)) {
     saved_offset = *ofs;
-    if (!match(r, pc + r->code[pc + 1], s, len, ofs, NULL)) {
+    if (!match(r, pc + r->code[pc + 1], s, len, ofs, NULL, 0)) {
       matched_offset = saved_offset;
     }
     *ofs = saved_offset;
@@ -365,9 +365,9 @@ static void loop_non_greedy(const struct slre *r, int pc, const char *s,
                             int len, int *ofs) {
   int  saved_offset = *ofs;
 
-  while (!match(r, pc + 2, s, len, ofs, NULL)) {
+  while (!match(r, pc + 2, s, len, ofs, NULL, 0)) {
     saved_offset = *ofs;
-    if (!match(r, pc + r->code[pc + 1], s, len, ofs, NULL))
+    if (!match(r, pc + r->code[pc + 1], s, len, ofs, NULL, 0))
       break;
   }
 
@@ -420,7 +420,7 @@ static int casecmp(const void *p1, const void *p2, size_t len) {
 }
 
 static const char *match(const struct slre *r, int pc, const char *s, int len,
-                         int *ofs, struct cap *caps) {
+                         int *ofs, struct cap *caps, int caps_size) {
   int n, saved_offset;
   const char *error_string = NULL;
   int (*cmp)(const void *string1, const void *string2, size_t len);
@@ -433,10 +433,11 @@ static const char *match(const struct slre *r, int pc, const char *s, int len,
     switch (r->code[pc]) {
       case BRANCH:
         saved_offset = *ofs;
-        error_string = match(r, pc + 3, s, len, ofs, caps);
+        error_string = match(r, pc + 3, s, len, ofs, caps, caps_size);
         if (error_string != NULL) {
           *ofs = saved_offset;
-          error_string = match(r, pc + r->code[pc + 1], s, len, ofs, caps);
+          error_string = match(r, pc + r->code[pc + 1], s, len, ofs, caps,
+                               caps_size);
         }
         pc += r->code[pc + 2];
         break;
@@ -455,7 +456,7 @@ static const char *match(const struct slre *r, int pc, const char *s, int len,
       case QUEST:
         error_string = NULL;
         saved_offset = *ofs;
-        if (match(r, pc + 2, s, len, ofs, caps) != NULL) {
+        if (match(r, pc + 2, s, len, ofs, caps, caps_size) != NULL) {
           *ofs = saved_offset;
         }
         pc += r->code[pc + 1];
@@ -474,17 +475,19 @@ static const char *match(const struct slre *r, int pc, const char *s, int len,
         break;
 
       case PLUS:
-        if ((error_string = match(r, pc + 2, s, len, ofs, caps)) != NULL)
+        if ((error_string = match(r, pc + 2, s, len, ofs,
+                                  caps, caps_size)) != NULL) {
           break;
-
+        }
         loop_greedy(r, pc, s, len, ofs);
         pc += r->code[pc + 1];
         break;
 
       case PLUSQ:
-        if ((error_string = match(r, pc + 2, s, len, ofs, caps)) != NULL)
+        if ((error_string = match(r, pc + 2, s, len, ofs,
+                                  caps, caps_size)) != NULL) {
           break;
-
+        }
         loop_non_greedy(r, pc, s, len, ofs);
         pc += r->code[pc + 1];
         break;
@@ -552,15 +555,23 @@ static const char *match(const struct slre *r, int pc, const char *s, int len,
         break;
 
       case OPEN:
-        if (caps != NULL)
-          caps[r->code[pc + 1]].ptr = s + *ofs;
+        if (caps != NULL) {
+          if (caps_size - 2 < r->code[pc + 1]) {
+            error_string = "Too many captures";
+          } else {
+            caps[r->code[pc + 1]].ptr = s + *ofs;
+          }
+        }
         pc += 2;
         break;
 
       case CLOSE:
-        if (caps != NULL)
+        if (caps != NULL) {
+          assert(r->code[pc + 1] >= 0);
+          assert(r->code[pc + 1] < caps_size);
           caps[r->code[pc + 1]].len = (s + *ofs) -
             caps[r->code[pc + 1]].ptr;
+        }
         pc += 2;
         break;
 
@@ -587,16 +598,20 @@ static const char *match(const struct slre *r, int pc, const char *s, int len,
 // hold all captures. The caller function must make sure it is! So, the
 // array_size = number_of_round_bracket_pairs + 1
 static const char *match2(const struct slre *r, const char *buf, int len,
-                          struct cap *caps) {
+                          struct cap *caps, int caps_size) {
   int  i, ofs = 0;
   const char *error_string = error_no_match;
 
+  if (caps != NULL) {
+    memset(caps, 0, caps_size * sizeof(caps[0]));
+  }
+
   if (r->anchored) {
-    error_string = match(r, 0, buf, len, &ofs, caps);
+    error_string = match(r, 0, buf, len, &ofs, caps, caps_size);
   } else {
     for (i = 0; i < len && error_string != NULL; i++) {
       ofs = i;
-      error_string = match(r, 0, buf, len, &ofs, caps);
+      error_string = match(r, 0, buf, len, &ofs, caps, caps_size);
     }
   }
 
@@ -671,7 +686,8 @@ const char *slre_match(enum slre_option options, const char *re,
 
   slre.options = options;
   if ((error_string = compile2(&slre, re)) == NULL &&
-      (error_string = match2(&slre, buf, buf_len, caps)) == NULL) {
+      (error_string = match2(&slre, buf, buf_len, caps,
+                             sizeof(caps) / sizeof(caps[0]))) == NULL) {
     va_start(ap, buf_len);
     error_string = capture(caps + 1, slre.num_caps, ap);
     va_end(ap);
@@ -823,6 +839,29 @@ int main(void) {
 
   assert(strcmp(error_no_match, slre_match(0, "bC", "aBc", 3)) == 0);
   assert(slre_match(SLRE_CASE_INSENSITIVE, "bC", "aBc", 3) == NULL);
+
+  {
+    struct slre slre;
+    struct cap caps[10];
+    char a[10], b[10];
+
+    memset(caps, 'x', sizeof(caps));
+    slre.options = 0;
+    assert(compile2(&slre, "(\\d(\\d)?)") == NULL);
+    assert(!strcmp(match2(&slre, "1", 1, caps, 2), "Too many captures"));
+    assert(match2(&slre, "1", 1, caps, 3) == NULL);
+    assert(slre.num_caps == 2);
+    assert(caps[1].len == 1);
+    assert(caps[2].len == 0);
+    assert(caps[1].ptr[0] == '1');
+
+    a[0] = b[0] = 'x';
+    assert(slre_match(0, "(\\d(\\d)?)", "1", 1,
+                      SLRE_STRING, sizeof(a), a,
+                      SLRE_STRING, sizeof(b), b) == NULL);
+    assert(!strcmp(a, "1"));
+    assert(b[0] == '\0');
+  }
 
   printf("%s\n", "All tests passed");
   return EXIT_SUCCESS;
