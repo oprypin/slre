@@ -819,9 +819,11 @@ int main(void) {
   }
 
   for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
-    if ((msg = slre_match(0, tests[i].regex, tests[i].str,
-                          strlen(tests[i].str), NULL)) != tests[i].msg) {
-      printf("Test %zd failed: [%s] [%s] -> [%s]\n", i, tests[i].str,
+    msg = slre_match(0, tests[i].regex, tests[i].str,
+                     strlen(tests[i].str), NULL);
+    if ((msg != NULL && tests[i].msg == NULL) ||
+        (msg != NULL && strcmp(msg, tests[i].msg) != 0)) {
+      printf("Test %d failed: [%s] [%s] -> [%s]\n", (int) i, tests[i].str,
              tests[i].regex, msg ? msg : "(null)");
       return EXIT_FAILURE;
     }
