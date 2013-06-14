@@ -22,6 +22,10 @@
 #ifndef SLRE_HEADER_DEFINED
 #define SLRE_HEADER_DEFINED
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // This is a regular expression library that implements a subset of Perl RE.
 // Please refer to http://slre.googlecode.com for detailed description.
 //
@@ -79,7 +83,12 @@
 
 enum slre_option {SLRE_CASE_INSENSITIVE = 1};
 enum slre_capture {SLRE_STRING, SLRE_INT, SLRE_FLOAT};
+
 const char *slre_match(enum slre_option options, const char *regexp,
                        const char *buf, int buf_len, ...);
 
-#endif /* SLRE_HEADER_DEFINED */
+#ifdef __cplusplus
+}
+#endif  // __cplusplus
+
+#endif // SLRE_HEADER_DEFINED
