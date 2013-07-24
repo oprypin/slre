@@ -47,6 +47,7 @@ extern "C" {
 //    ?        Match zero or once
 //    \xDD     Match byte with hex value 0xDD
 //    \meta    Match one of the meta character: ^$().[*+\?
+//    x|y      Match x or y (alternation operator)
 
 // Match string buffer "buf" of length "buf_len" against "regexp", which should
 // conform the syntax outlined above. "options" could be either 0 or
