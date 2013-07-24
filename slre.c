@@ -35,8 +35,8 @@
 
 // Compiled regular expression
 struct slre {
-  unsigned char code[256];
-  unsigned char data[256];
+  unsigned char code[512];
+  unsigned char data[512];
   int code_size;
   int data_size;
   int num_caps;   // Number of bracket pairs
@@ -163,14 +163,33 @@ static void anyof(struct slre *r, const char **re) {
       case '\\':
         esc = get_escape_char(re);
         if ((esc & 0xff) == 0) {
+          int digits;
           store_char_in_data(r, 0);
           store_char_in_data(r, esc >> 8);
+          if ((*re)[-1] == 'd') { //decimal digits
+            for (digits = '0'; digits <= '9'; ++digits)
+              store_char_in_data(r, digits);
+          }
         } else {
           store_char_in_data(r, esc);
         }
         break;
       default:
-        store_char_in_data(r, (*re)[-1]);
+        if (**re == '-') { //range e.g. a-z
+          int digits, ch;
+          if ((*re)[-1] < (*re)[1]) {
+            ch = (*re)[-1];
+            while (ch <= (*re)[1]) {
+              store_char_in_data(r, ch);
+              ch++;
+            }
+            *re += 2;
+          } else {
+            r->error_string = "Invalid character range";
+          }
+        } else {
+          store_char_in_data(r, (*re)[-1]);
+        }
         break;
     }
 
@@ -871,6 +890,25 @@ int main(void) {
                       SLRE_STRING, sizeof(b), b) == NULL);
     assert(!strcmp(a, "1"));
     assert(b[0] == '\0');
+  }
+
+  { //Range test
+    char range[32];
+    strcpy(range, "http://thisisatest");
+    error = slre_match(0, "([h-t]+)://(.*)",
+                       range, strlen(range),
+                       SLRE_STRING, sizeof(method), method,
+                       SLRE_STRING, sizeof(uri), uri);
+    assert(error == NULL);
+    assert(!strcmp(method, "http"));
+
+    strcpy(range, "digitrangetest12345");
+    error = slre_match(0, "(.*?)([\\d]+)",
+                       range, strlen(range),
+                       SLRE_STRING, sizeof(uri), uri,
+                       SLRE_STRING, sizeof(method), method );
+    assert(error == NULL);
+    assert(!strcmp(method, "12345"));
   }
 
   printf("%s\n", "All tests passed");
